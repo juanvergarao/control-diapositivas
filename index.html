@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0e1116">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icono.svg">
+<title>Control Diapositivas</title>
+<style>
+  :root {
+    --fondo: #0e1116; --panel: #181c23; --panel2: #222832; --texto: #e8ecf1; --suave: #8a94a3;
+    --acento: #01677E; --acento2: #0a8aa6; --rojo: #E63312; --ok: #3fb950;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body { margin: 0; height: 100%; background: var(--fondo); color: var(--texto);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overscroll-behavior: none; }
+  body { display: flex; flex-direction: column; padding: max(12px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom)); gap: 12px; }
+  .oculto { display: none !important; }
+
+  /* Enlace */
+  #enlace { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 18px; text-align: center; }
+  #enlace h1 { font-size: 26px; margin: 0; }
+  #enlace p { color: var(--suave); margin: 0; font-size: 16px; line-height: 1.4; }
+  .paso { background: var(--panel); border-radius: 16px; padding: 14px 16px; text-align: left; font-size: 16px; line-height: 1.45; color: var(--suave); }
+  .paso b { color: var(--texto); }
+  .punto.espera { background: #d29922; }
+  #pin { font-size: 44px; letter-spacing: 18px; text-align: center; padding: 14px 0 14px 18px; border-radius: 16px;
+    border: 2px solid var(--panel2); background: var(--panel); color: var(--texto); width: 100%; user-select: text; }
+  #pin:focus { outline: none; border-color: var(--acento2); }
+  .boton-grande { font-size: 22px; font-weight: 700; padding: 20px; border-radius: 16px; border: 0;
+    background: var(--acento); color: #fff; }
+  #error { color: var(--rojo); min-height: 22px; font-size: 16px; }
+
+  /* Control */
+  #control { flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  .barra { display: flex; align-items: center; justify-content: space-between; font-size: 15px; color: var(--suave); }
+  .estado { display: flex; align-items: center; gap: 8px; }
+  .punto { width: 10px; height: 10px; border-radius: 50%; background: var(--suave); }
+  .punto.ok { background: var(--ok); } .punto.mal { background: var(--rojo); }
+  .tiempo { display: flex; gap: 10px; align-items: stretch; }
+  .reloj { flex: 1; background: var(--panel); border-radius: 16px; padding: 10px 14px; display: flex; flex-direction: column; }
+  .reloj small { color: var(--suave); font-size: 13px; }
+  .reloj b { font-size: 30px; font-variant-numeric: tabular-nums; font-weight: 700; }
+  button { font-family: inherit; color: var(--texto); cursor: pointer; }
+  .tecla { border: 0; border-radius: 18px; background: var(--panel2); font-size: 18px; font-weight: 600;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px;
+    transition: transform .08s, filter .08s; }
+  .tecla:active, .tecla.pulsada { transform: scale(.97); filter: brightness(1.35); }
+  .tecla svg { width: 30px; height: 30px; }
+  .fila { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; height: 78px; }
+  .fila .tecla { font-size: 15px; }
+  #anterior { height: 110px; font-size: 22px; }
+  #siguiente { flex: 1; min-height: 170px; background: var(--acento); font-size: 34px; color: #fff; }
+  #siguiente svg { width: 64px; height: 64px; }
+  #negro.activo { background: #000; outline: 2px solid var(--suave); }
+  .pie { display: flex; justify-content: space-between; font-size: 13px; color: var(--suave); }
+  .pie button { background: none; border: 0; color: var(--suave); font-size: 13px; text-decoration: underline; padding: 4px; }
+</style>
+</head>
+<body>
+
+<section id="enlace" class="oculto">
+  <h1>Enlazar con el PC</h1>
+  <p>Se hace una sola vez.</p>
+  <div class="paso">1. En el PC abre <b>«Control Diapositivas»</b>.</div>
+  <div class="paso">2. Escanea el <b>QR grande</b> con la cámara del celular.</div>
+  <div class="paso">3. Agrega esta página a la pantalla de inicio (menú ⋮ → <b>Agregar a pantalla principal</b>).</div>
+  <div id="error"></div>
+</section>
+
+
+<section id="control" class="oculto">
+  <div class="barra">
+    <div class="estado"><span class="punto" id="punto"></span><span id="equipo">Conectando…</span></div>
+    <span id="hora"></span>
+  </div>
+
+  <div class="tiempo">
+    <div class="reloj"><small>Tiempo de presentación</small><b id="crono">00:00</b></div>
+    <button class="tecla" id="btnCrono" style="width:96px">Iniciar</button>
+  </div>
+
+  <div class="fila">
+    <button class="tecla" data-accion="inicio">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Desde inicio</button>
+    <button class="tecla" data-accion="actual">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M10 9l4 2-4 2z" fill="currentColor"/></svg>Desde actual</button>
+    <button class="tecla" data-accion="salir">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg>Terminar</button>
+  </div>
+
+  <div class="fila">
+    <button class="tecla" data-accion="primera">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>Primera</button>
+    <button class="tecla" data-accion="negro" id="negro">
+      <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="5" width="18" height="14" rx="2"/></svg>Pantalla negra</button>
+    <button class="tecla" data-accion="ultima">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg>Última</button>
+  </div>
+
+  <button class="tecla" id="anterior" data-accion="anterior">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>Anterior</button>
+  <button class="tecla" id="siguiente" data-accion="siguiente">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>Siguiente</button>
+
+  <div class="pie"><span id="via">Desliza ← → sobre «Siguiente»</span><button id="btnOlvidar">Desenlazar</button></div>
+</section>
+
+<script>
+const $ = s => document.querySelector(s);
+const leer = k => { try { return localStorage.getItem(k); } catch { return null; } };
+const escribir = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} };
+const NTFY = "https://ntfy.sh/";
+// Página servida por el propio PC (red local) o publicada en internet.
+const LOCAL = location.protocol === "http:";
+
+// --- SHA-256 / HMAC en JS puro: crypto.subtle no existe en http:// ---------
+const K256 = new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+  0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,
+  0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,
+  0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,
+  0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,
+  0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+function sha256(bytes) {
+  const l = bytes.length, n = ((l + 9 + 63) >> 6) << 6, m = new Uint8Array(n);
+  m.set(bytes); m[l] = 0x80;
+  const dv = new DataView(m.buffer); dv.setUint32(n - 4, l * 8); dv.setUint32(n - 8, Math.floor(l / 0x20000000));
+  const h = new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]);
+  const w = new Uint32Array(64), r = (x, k) => (x >>> k) | (x << (32 - k));
+  for (let o = 0; o < n; o += 64) {
+    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(o + i * 4);
+    for (let i = 16; i < 64; i++) {
+      const s0 = r(w[i-15], 7) ^ r(w[i-15], 18) ^ (w[i-15] >>> 3), s1 = r(w[i-2], 17) ^ r(w[i-2], 19) ^ (w[i-2] >>> 10);
+      w[i] = w[i-16] + s0 + w[i-7] + s1;
+    }
+    let [a, b, c, d, e, f, g, hh] = h;
+    for (let i = 0; i < 64; i++) {
+      const t1 = (hh + (r(e, 6) ^ r(e, 11) ^ r(e, 25)) + ((e & f) ^ (~e & g)) + K256[i] + w[i]) >>> 0;
+      const t2 = ((r(a, 2) ^ r(a, 13) ^ r(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
+      hh = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
+  }
+  const out = new Uint8Array(32); const ov = new DataView(out.buffer); h.forEach((v, i) => ov.setUint32(i * 4, v)); return out;
+}
+function hmacHex(clave, texto) {
+  let k = clave.length > 64 ? sha256(clave) : clave; const kp = new Uint8Array(64); kp.set(k);
+  const msg = new TextEncoder().encode(texto), ip = new Uint8Array(64 + msg.length), op = new Uint8Array(96);
+  for (let i = 0; i < 64; i++) { ip[i] = kp[i] ^ 0x36; op[i] = kp[i] ^ 0x5c; }
+  ip.set(msg, 64); op.set(sha256(ip), 64);
+  return [...sha256(op)].map(x => x.toString(16).padStart(2, "0")).join("");
+}
+function b64url(s) { const b = atob(s.replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(b, c => c.charCodeAt(0)); }
+
+// --- Enlace ------------------------------------------------------------------
+const frag = new URLSearchParams(location.hash.slice(1));
+if (frag.get("c") && frag.get("k")) {
+  escribir("canal", frag.get("c")); escribir("clave", frag.get("k")); escribir("equipo", frag.get("e") || "el PC");
+  history.replaceState(null, "", location.pathname);
+}
+let canal = leer("canal"), clave = leer("clave");
+
+function vibrar(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
+function mostrar(vista) {
+  $("#enlace").classList.toggle("oculto", vista !== "enlace");
+  $("#control").classList.toggle("oculto", vista !== "control");
+}
+
+function estado(tipo, texto) {
+  $("#punto").className = "punto " + tipo;
+  $("#equipo").textContent = texto;
+}
+const nombrePC = () => leer("equipo") || "el PC";
+$("#via").textContent = LOCAL ? "Vía red local · " + location.host : "Vía internet · cualquier red";
+
+// --- Respuestas del PC (vía internet) ---------------------------------------
+const pendientes = new Map();
+let fuente = null;
+function escucharRespuestas() {
+  if (LOCAL || !canal || fuente) return;
+  fuente = new EventSource(NTFY + canal + "r/sse");
+  fuente.onmessage = ev => {
+    try {
+      const j = JSON.parse(JSON.parse(ev.data).message);
+      if (j.equipo) escribir("equipo", j.equipo);
+      const p = pendientes.get(j.n); if (p) { pendientes.delete(j.n); p(); }
+    } catch {}
+  };
+}
+
+function firmar(accion) {
+  const t = Date.now(), n = Math.random().toString(36).slice(2) + t.toString(36);
+  return { a: accion, t, n, s: hmacHex(b64url(clave), accion + "|" + t + "|" + n) };
+}
+
+async function enviar(accion) {
+  const orden = firmar(accion);
+  if (LOCAL) {
+    const r = await fetch("/api/orden", { method: "POST", body: JSON.stringify(orden) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.motivo || "rechazada");
+    if (j.equipo) escribir("equipo", j.equipo);
+    return "red local";
+  }
+  escucharRespuestas();
+  const respondio = new Promise(ok => pendientes.set(orden.n, ok));
+  // text/plain y sin cabeceras propias: no dispara la consulta previa CORS.
+  const r = await fetch(NTFY + canal + "?cache=no", { method: "POST", body: JSON.stringify(orden) });
+  if (!r.ok) throw new Error("internet");
+  const ok = await Promise.race([respondio.then(() => true), new Promise(f => setTimeout(() => f(false), 5000))]);
+  pendientes.delete(orden.n);
+  if (!ok) throw new Error("sin respuesta");
+  return "internet";
+}
+
+function explicar(e) {
+  if (e.message === "sin respuesta") return "El PC no responde · ¿está abierto «Control Diapositivas»?";
+  if (e.message === "firma inválida") return "Clave antigua · vuelve a escanear el QR del PC";
+  if (/vencida/.test(e.message)) return "La hora del celular no coincide con la del PC";
+  return LOCAL ? "Sin conexión con el PC por la red local" : "Sin internet en el celular";
+}
+
+async function ping() {
+  if (!clave || document.visibilityState !== "visible") return;
+  try { const via = await enviar("ping"); estado("ok", "Conectado a " + nombrePC() + " · " + via); }
+  catch (e) { estado("mal", explicar(e)); }
+}
+
+async function accion(nombre, boton) {
+  vibrar(nombre === "siguiente" || nombre === "anterior" ? 35 : 50);
+  if (boton) { boton.classList.add("pulsada"); setTimeout(() => boton.classList.remove("pulsada"), 150); }
+  if (nombre === "negro") $("#negro").classList.toggle("activo");
+  else if (["siguiente", "anterior", "salir", "primera", "ultima"].includes(nombre)) $("#negro").classList.remove("activo");
+  if (nombre === "inicio" || nombre === "actual") iniciarCrono(true);
+  estado("espera", "Enviando…");
+  try { const via = await enviar(nombre); estado("ok", "Conectado a " + nombrePC() + " · " + via); }
+  catch (e) { estado("mal", explicar(e)); vibrar([100, 60, 100]); }
+}
+
+document.querySelectorAll("[data-accion]").forEach(b =>
+  b.addEventListener("click", () => accion(b.dataset.accion, b)));
+
+// Deslizar sobre el botón grande
+let x0 = null;
+$("#siguiente").addEventListener("touchstart", e => { x0 = e.touches[0].clientX; }, { passive: true });
+$("#siguiente").addEventListener("touchend", e => {
+  if (x0 == null) return;
+  const dx = e.changedTouches[0].clientX - x0; x0 = null;
+  if (Math.abs(dx) > 60) { e.preventDefault(); accion(dx < 0 ? "siguiente" : "anterior", $("#siguiente")); }
+});
+
+// Cronómetro y hora
+let t0 = null, corriendo = false, acumulado = 0;
+function iniciarCrono(soloSiDetenido) {
+  if (corriendo && soloSiDetenido) return;
+  if (corriendo) { acumulado += Date.now() - t0; corriendo = false; $("#btnCrono").textContent = "Seguir"; }
+  else { t0 = Date.now(); corriendo = true; $("#btnCrono").textContent = "Pausa"; }
+}
+$("#btnCrono").addEventListener("click", () => iniciarCrono(false));
+$("#btnCrono").addEventListener("dblclick", () => { corriendo = false; acumulado = 0; $("#btnCrono").textContent = "Iniciar"; });
+function tic() {
+  const ms = acumulado + (corriendo ? Date.now() - t0 : 0), s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = s % 60;
+  $("#crono").textContent = (h ? h + ":" : "") + String(m).padStart(2, "0") + ":" + String(ss).padStart(2, "0");
+  $("#hora").textContent = new Date().toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
+}
+setInterval(tic, 500); tic();
+
+$("#btnOlvidar").addEventListener("click", () => {
+  ["canal", "clave", "equipo"].forEach(k => escribir(k, null)); canal = clave = null;
+  if (fuente) { fuente.close(); fuente = null; }
+  mostrar("enlace");
+});
+
+// Mantener la pantalla encendida cuando el navegador lo permite
+async function despierto() { try { if ("wakeLock" in navigator && document.visibilityState === "visible") await navigator.wakeLock.request("screen"); } catch {} }
+document.addEventListener("visibilitychange", () => { despierto(); ping(); });
+
+// Funciona sin conexión una vez instalada (solo en https)
+if ("serviceWorker" in navigator && !LOCAL) navigator.serviceWorker.register("sw.js").catch(() => {});
+
+mostrar(clave ? "control" : "enlace");
+if (clave) { estado("espera", "Buscando a " + nombrePC() + "…"); escucharRespuestas(); }
+despierto(); ping(); setInterval(ping, 60000);
+</script>
+</body>
+</html>
